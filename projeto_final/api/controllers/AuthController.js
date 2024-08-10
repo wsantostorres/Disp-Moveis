@@ -1,10 +1,12 @@
 const { pool } = require('../db');
+const { jwtSecret } = require('../auth');
+const jsonwebtoken = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const saltRounds = 7;
 
 const login = async (req, res) => {
     try {
-        const { phone, password } = req.body;
+        const { phone, password, keepAlive } = req.body;
         let passwordHash = null;
 
         pool.getConnection(function (err, connection) {
@@ -17,7 +19,28 @@ const login = async (req, res) => {
                         const passwordVerified = await bcrypt.compare(password, passwordHash);
                     
                         if(passwordVerified){
-                            res.status(200).json(rows);
+                            // Entra aqui se tudo estiver certo
+                            const user = {
+                                "id": rows[0].id,
+                                "phone": rows[0].phone,
+                            };
+
+                            let token = null;
+
+                            if(keepAlive){
+                                token = jsonwebtoken.sign(
+                                    { user },
+                                    jwtSecret,
+                                );
+                            }else{
+                                token = jsonwebtoken.sign(
+                                    { user },
+                                    jwtSecret,
+                                    { expiresIn: '60m'}
+                                );
+                            }
+
+                            res.status(200).json({data: { user, token }});
                         }else{
                             res.status(400).json({error: "Senha incorreta."});
                         }
